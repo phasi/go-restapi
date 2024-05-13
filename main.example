@@ -1,0 +1,96 @@
+package main
+
+import (
+	"fmt"
+	"net/http"
+
+
+	api "gitlab.com/naoapp/go-restapi"
+)
+
+func main() {
+
+	cors := api.CORSConfig{
+		AllowedOrigins: []string{"localhost:8080"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE"},
+		// AllowedHeaders:   []string{"Content-Type", "Authorization", "Origin"},
+		AllowCredentials: false,
+		// BlockUserAgents:  []string{"curl"},
+	}
+
+	router := &api.Router{BasePath: "/api/v1"}
+
+	router.AuthorizationMiddleware = func(context *api.RouteContext, handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// check if the request has a valid token
+			if r.Header.Get("Authorization") != "" {
+				// simulate token validation
+				if r.Header.Get("Authorization") == "Bearer" {
+					// add user_id to route params
+					context.Params.Set("user_id", "123")
+					handler.ServeHTTP(w, r)
+				} else {
+					http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				}
+				return
+			}
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		})
+	}
+
+	// adding logging and tracing middleware
+	loggedRouter := api.LoggingRouter(router)
+	tracedRouter := api.TracingRouter(loggedRouter)
+
+	// private route using route params
+	router.HandleFuncProtected("GET", "/customers/:id", cors.MiddlewareFunc(func(w http.ResponseWriter, r *http.Request, context api.RouteContext) {
+		// example: get id from route params
+		id, err := context.Params.Get("id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		fmt.Fprintf(w, "Customer ID: %s", id)
+		////
+		// example: get user_id that was injected by the AuthorizationMiddleware
+		userId, err := context.Params.Get("user_id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		fmt.Fprintf(w, "User ID: %s", userId)
+	}))
+
+	// public route using route params
+	router.HandleFunc("GET", "/users/:id/transactions/:transaction_id", func(w http.ResponseWriter, r *http.Request, context api.RouteContext) {
+		// Example: get id and transaction_id from route params
+		id, err := context.Params.Get("id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		transactionID, err := context.Params.Get("transaction_id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		fmt.Fprintf(w, "User ID: %s", id)
+		fmt.Fprintf(w, "Transaction ID: %s", transactionID)
+	})
+
+	// public route using route params
+	router.HandleFunc("GET", "/users/:id/transactions", func(w http.ResponseWriter, r *http.Request, context api.RouteContext) {
+		id, err := context.Params.Get("id")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		fmt.Fprintf(w, "User ID: %s wants all transactions", id)
+	})
+
+	// start server
+	http.ListenAndServe(":8080", tracedRouter)
+	// optionally (and instead of the above line), you can use the CORS middleware to protect all routes
+	// corsProtectedRouter := cors.CORSRouter(tracedRouter)
+	// http.ListenAndServe(":8080", corsProtectedRouter)
+}
