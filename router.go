@@ -4,15 +4,50 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"errors"
 )
 
+type Permission int
 type RouteContext struct {
-	Params *RouteParams
-	userId string
+	Params              *RouteParams
+	userId              string
+	requiredPermissions []Permission
 }
 
-func (rc *RouteContext) GetUserId() string {
-	return rc.userId
+func (rc *RouteContext) HasRequiredPermissions(userPermissions []Permission) (hasAllPermissions bool) {
+	hasAllPermissions = true
+	if (rc.requiredPermissions == nil) || (len(rc.requiredPermissions) == 0) {
+		return
+	}
+	for _, requiredPermission := range rc.requiredPermissions {
+		hasPermission := false
+		for _, userPermission := range userPermissions {
+			if userPermission == requiredPermission {
+				hasPermission = true
+				break
+			}
+		}
+		if !hasPermission {
+			hasAllPermissions = false
+			break
+		}
+	}
+	return
+}
+
+func (rc *RouteContext) GetRequiredPermissions() ([]Permission, error) {
+	if rc.requiredPermissions == nil {
+		return nil, errors.New("permissions not set")
+	}
+	return rc.requiredPermissions, nil
+}
+
+func (rc *RouteContext) GetUserId() (string, error) {
+	if rc.userId == "" {
+		return "", errors.New("userId not set")
+	}
+	return rc.userId, nil
 }
 
 func (rc *RouteContext) SetUserId(userId string) {
@@ -29,47 +64,46 @@ func (rp RouteParams) Get(key string) (string, error) {
 	return value, nil
 }
 
-func (rp RouteParams) Set(key, value string) {
-	rp[key] = value
-}
-
-type RouteHandlerFunc func(http.ResponseWriter, *http.Request, RouteContext)
+type RouteHandlerFunc func(http.ResponseWriter, *http.Request, *RouteContext)
 
 type Route struct {
-	Method       string
-	RelativePath string
-	Handler      RouteHandlerFunc
-	Protected    bool
+	Method              string
+	RelativePath        string
+	RequiredPermissions []Permission
+	Handler             RouteHandlerFunc
+	Protected           bool
 }
 
 type Router struct {
 	BasePath                string
 	Routes                  []Route
 	AuthorizationMiddleware func(context *RouteContext, handler http.Handler) http.Handler
+	PermissionMiddleware    func(context *RouteContext, handler http.Handler) http.Handler
 }
 
-func (r *Router) HandleFunc(method, path string, handler RouteHandlerFunc) {
+func (router *Router) HandleFunc(method, path string, handler RouteHandlerFunc) {
 	route := Route{
 		Method:       method,
-		RelativePath: strings.TrimRight(r.BasePath, "/") + path,
+		RelativePath: strings.TrimRight(router.BasePath, "/") + path,
 		Handler:      handler,
 		Protected:    false,
 	}
-	r.Routes = append(r.Routes, route)
+	router.Routes = append(router.Routes, route)
 }
 
-func (r *Router) HandleFuncProtected(method, path string, handler RouteHandlerFunc) {
+func (router *Router) HandleProtectedFunc(method, path string, requiredPermissions []Permission, handler RouteHandlerFunc) {
 	route := Route{
-		Method:       method,
-		RelativePath: strings.TrimRight(r.BasePath, "/") + path,
-		Handler:      handler,
-		Protected:    true,
+		Method:              method,
+		RelativePath:        strings.TrimRight(router.BasePath, "/") + path,
+		RequiredPermissions: requiredPermissions,
+		Handler:             handler,
+		Protected:           true,
 	}
-	r.Routes = append(r.Routes, route)
+	router.Routes = append(router.Routes, route)
 }
 
-func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	for _, route := range r.Routes {
+func (router *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	for _, route := range router.Routes {
 		if req.Method != route.Method {
 			continue
 		}
@@ -79,7 +113,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			continue
 		}
 		params := make(RouteParams)
-		context := &RouteContext{Params: &params}
+		routeContext := &RouteContext{Params: &params}
 		match := true
 		for i, routeSegment := range routeSegments {
 			if strings.HasPrefix(routeSegment, ":") {
@@ -89,18 +123,28 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				break
 			}
 		}
+
+		// pass required permissions to route context
+		routeContext.requiredPermissions = route.RequiredPermissions
+
 		if match {
 			if route.Protected {
-				if r.AuthorizationMiddleware == nil {
+				if router.AuthorizationMiddleware == nil {
 					http.Error(w, "Router.AuthorizationMiddleware is not set", http.StatusInternalServerError)
 					return
 				}
-				r.AuthorizationMiddleware(context, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					route.Handler(w, r, *context)
+				if router.PermissionMiddleware == nil {
+					http.Error(w, "Router.PermissionMiddleware is not set", http.StatusInternalServerError)
+					return
+				}
+				router.AuthorizationMiddleware(routeContext, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					router.PermissionMiddleware(routeContext, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						route.Handler(w, r, routeContext)
+					})).ServeHTTP(w, r)
 				})).ServeHTTP(w, req)
 				return
 			}
-			route.Handler(w, req, *context)
+			route.Handler(w, req, routeContext)
 			return
 		}
 	}

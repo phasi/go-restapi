@@ -31,11 +31,15 @@ func LoggingRouter(next http.Handler) http.Handler {
 	})
 }
 
+type contextKey string
+
+var contextKeyTraceID = contextKey("traceID")
+
 // TracingRouter is a middleware that adds a trace ID to the request context and response headers
 func TracingRouter(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		traceID := uuid.New().String()
-		ctx := context.WithValue(r.Context(), "traceID", traceID)
+		ctx := context.WithValue(r.Context(), contextKeyTraceID, traceID)
 		w.Header().Set("X-Trace-ID", traceID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -67,14 +71,14 @@ func (config *CORSConfig) applyCORS(w http.ResponseWriter, r *http.Request) (err
 			}
 		}
 		if !isAllowedOrigin {
-			err = errors.New("Origin not allowed")
+			err = errors.New("origin not allowed")
 			return
 		}
 	}
 
 	method := r.Method
 	if !strings.Contains(strings.Join(config.AllowedMethods, ","), method) {
-		err = errors.New("Method not allowed")
+		err = errors.New("method not allowed")
 		return
 	}
 	if len(config.AllowedHeaders) > 0 {
@@ -98,7 +102,7 @@ func (config *CORSConfig) applyCORS(w http.ResponseWriter, r *http.Request) (err
 
 			// Check if the header name is in the list of allowed headers
 			if !strings.Contains(strings.ToLower(strings.Join(config.AllowedHeaders, ",")), lowerHeaderName) {
-				err = errors.New("Header not allowed")
+				err = errors.New("header not allowed")
 				return
 			}
 		}
@@ -108,7 +112,7 @@ func (config *CORSConfig) applyCORS(w http.ResponseWriter, r *http.Request) (err
 	w.Header().Set("Access-Control-Allow-Methods", strings.Join(config.AllowedMethods, ","))
 	w.Header().Set("Access-Control-Allow-Headers", strings.Join(config.AllowedHeaders, ","))
 	var allowCredentials string
-	if config.AllowCredentials == true {
+	if config.AllowCredentials {
 		allowCredentials = "true"
 	} else {
 		allowCredentials = "false"
@@ -119,7 +123,7 @@ func (config *CORSConfig) applyCORS(w http.ResponseWriter, r *http.Request) (err
 
 // MiddlewareFunc is a middleware that should be used to wrap individual handler functions (RouteHandlerFunc)
 func (config *CORSConfig) MiddlewareFunc(next RouteHandlerFunc) RouteHandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request, context RouteContext) {
+	return func(w http.ResponseWriter, r *http.Request, context *RouteContext) {
 		err := config.applyCORS(w, r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusForbidden)
