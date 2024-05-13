@@ -3,7 +3,6 @@ package restapi
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"strings"
 
@@ -22,13 +21,28 @@ func (sw *statusWriter) WriteHeader(statusCode int) {
 	sw.ResponseWriter.WriteHeader(statusCode)
 }
 
+type HttpLogEntry struct {
+	Method  string              `json:"method"`
+	Path    string              `json:"path"`
+	Status  int                 `json:"status"`
+	Headers map[string][]string `json:"headers"`
+}
+
 // LoggingRouter is a middleware that logs the request method, URL path and response status code
-func LoggingRouter(next http.Handler) http.Handler {
+func LoggingRouter(next http.Handler, logFunc func(entry HttpLogEntry)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sw := statusWriter{ResponseWriter: w}
 		next.ServeHTTP(&sw, r)
-		log.Println(r.Method, r.URL.Path, sw.status)
+		headers := make(map[string][]string)
+		for key, value := range r.Header {
+			if key == "Authorization" {
+				continue
+			}
+			headers[key] = value
+		}
+		logFunc(HttpLogEntry{r.Method, r.URL.Path, sw.status, headers})
 	})
+
 }
 
 type contextKey string
