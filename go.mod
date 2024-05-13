@@ -1,4 +1,4 @@
-module gitlab.com/naoapp/go-restapi
+module gitlab.com/naoapp/go-libraries/go-restapi
 
 go 1.16
 
