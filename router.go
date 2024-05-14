@@ -8,7 +8,7 @@ import (
 	"errors"
 )
 
-type Permission int
+type Permission uint
 type RouteContext struct {
 	Params              *RouteParams
 	userId              string

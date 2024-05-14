@@ -36,7 +36,7 @@ func LoggingRouter(next http.Handler, logFunc func(entry HttpLogEntry)) http.Han
 		headers := make(map[string][]string)
 		for key, value := range r.Header {
 			if key == "Authorization" {
-				continue
+				headers[key] = []string{"[REDACTED]"}
 			}
 			headers[key] = value
 		}
