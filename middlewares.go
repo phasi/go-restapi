@@ -12,13 +12,17 @@ import (
 // statusWriter is a wrapper around the ResponseWriter that stores the status code
 type statusWriter struct {
 	http.ResponseWriter
-	status int
+	status      int
+	wroteHeader bool
 }
 
 // WriteHeader is a wrapper around the ResponseWriter's WriteHeader method that stores the status code
 func (sw *statusWriter) WriteHeader(statusCode int) {
-	sw.status = statusCode
-	sw.ResponseWriter.WriteHeader(statusCode)
+	if !sw.wroteHeader {
+		sw.status = statusCode
+		sw.ResponseWriter.WriteHeader(statusCode)
+		sw.wroteHeader = true
+	}
 }
 
 type HttpLogEntry struct {
