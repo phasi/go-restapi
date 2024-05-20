@@ -39,5 +39,5 @@ func WriteJSON(w http.ResponseWriter, data interface{}) {
 			Data:      data,
 		}
 	}
-	json.NewEncoder(sw).Encode(data)
+	json.NewEncoder(sw).Encode(data)  // TODO: handle error
 }

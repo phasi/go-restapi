@@ -38,6 +38,7 @@ func LoggingRouter(next http.Handler, logFunc func(entry HttpLogEntry)) http.Han
 		sw := statusWriter{ResponseWriter: w}
 		next.ServeHTTP(&sw, r)
 		headers := make(map[string][]string)
+		// TODO: fix redacted
 		for key, value := range r.Header {
 			if key == "Authorization" {
 				headers[key] = []string{"[REDACTED]"}
