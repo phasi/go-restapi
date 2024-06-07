@@ -32,19 +32,41 @@ type HttpLogEntry struct {
 	Headers map[string][]string `json:"headers"`
 }
 
+var redactedHeaderNames = []string{}
+
+// SetRedactedHeaderNames sets the list of header names that should be redacted in the logs
+func SetRedactedHeaderNames(headerNames []string) {
+	redactedHeaderNames = headerNames
+}
+
+func inRedactedHeaders(headerName string) bool {
+	for _, redactedHeaderName := range redactedHeaderNames {
+		if redactedHeaderName == headerName {
+			return true
+		}
+	}
+	return false
+}
+
+func redactHeaders(headers http.Header) map[string][]string {
+	redactedHeader := []string{"[REDACTED]"}
+	redactedHeaders := make(map[string][]string)
+	for key, value := range headers {
+		if inRedactedHeaders(key) {
+			redactedHeaders[key] = redactedHeader
+		} else {
+			redactedHeaders[key] = value
+		}
+	}
+	return redactedHeaders
+}
+
 // LoggingRouter is a middleware that logs the request method, URL path and response status code
 func LoggingRouter(next http.Handler, logFunc func(entry HttpLogEntry)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sw := statusWriter{ResponseWriter: w}
 		next.ServeHTTP(&sw, r)
-		headers := make(map[string][]string)
-		// TODO: fix redacted
-		for key, value := range r.Header {
-			if key == "Authorization" {
-				headers[key] = []string{"[REDACTED]"}
-			}
-			headers[key] = value
-		}
+		headers := redactHeaders(r.Header)
 		logFunc(HttpLogEntry{r.Method, r.URL.Path, sw.status, headers})
 	})
 
