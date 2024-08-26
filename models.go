@@ -13,6 +13,7 @@ type Response struct {
 	Data      interface{} `json:"data"`
 }
 
+// WriteJSON writes a JSON response to the ResponseWriter
 func WriteJSON(w http.ResponseWriter, data interface{}) {
 	sw := &statusWriter{ResponseWriter: w}
 	sw.Header().Set("Content-Type", "application/json")
@@ -39,5 +40,10 @@ func WriteJSON(w http.ResponseWriter, data interface{}) {
 			Data:      data,
 		}
 	}
-	json.NewEncoder(sw).Encode(data)  // TODO: handle error
+	json.NewEncoder(sw).Encode(data) // TODO: handle error
+}
+
+// ReadJSON reads a JSON request from the Request and decodes it into the provided interface
+func ReadJSON(r *http.Request, v interface{}) error {
+	return json.NewDecoder(r.Body).Decode(v)
 }
