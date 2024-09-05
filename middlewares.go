@@ -30,6 +30,7 @@ type HttpLogEntry struct {
 	Path    string              `json:"path"`
 	Status  int                 `json:"status"`
 	Headers map[string][]string `json:"headers"`
+	TraceID string              `json:"trace_id,omitempty"`
 }
 
 var redactedHeaderNames = []string{}
@@ -67,7 +68,13 @@ func LoggingRouter(next http.Handler, logFunc func(entry HttpLogEntry)) http.Han
 		sw := statusWriter{ResponseWriter: w}
 		next.ServeHTTP(&sw, r)
 		headers := redactHeaders(r.Header)
-		logFunc(HttpLogEntry{r.Method, r.URL.Path, sw.status, headers})
+		traceID := r.Context().Value(contextKeyTraceID)
+		// try to convert traceID to string
+		traceIDString, ok := traceID.(string)
+		if !ok {
+			traceIDString = ""
+		}
+		logFunc(HttpLogEntry{r.Method, r.URL.Path, sw.status, headers, traceIDString})
 	})
 
 }
