@@ -82,9 +82,13 @@ type Router struct {
 }
 
 func (router *Router) HandleFunc(method, path string, handler RouteHandlerFunc) {
+	fixedPath := strings.TrimRight(router.BasePath, "/") + path
+	if path == "/" {
+		fixedPath = router.BasePath
+	}
 	route := Route{
 		Method:       method,
-		RelativePath: strings.TrimRight(router.BasePath, "/") + path,
+		RelativePath: fixedPath,
 		Handler:      handler,
 		Protected:    false,
 	}
@@ -92,9 +96,13 @@ func (router *Router) HandleFunc(method, path string, handler RouteHandlerFunc) 
 }
 
 func (router *Router) HandleProtectedFunc(method, path string, requiredPermissions []Permission, handler RouteHandlerFunc) {
+	fixedPath := strings.TrimRight(router.BasePath, "/") + path
+	if path == "/" {
+		fixedPath = router.BasePath
+	}
 	route := Route{
 		Method:              method,
-		RelativePath:        strings.TrimRight(router.BasePath, "/") + path,
+		RelativePath:        fixedPath,
 		RequiredPermissions: requiredPermissions,
 		Handler:             handler,
 		Protected:           true,
@@ -123,7 +131,6 @@ func (router *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				break
 			}
 		}
-
 		// pass required permissions to route context
 		routeContext.requiredPermissions = route.RequiredPermissions
 
@@ -145,6 +152,39 @@ func (router *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 			route.Handler(w, req, routeContext)
+			return
+		}
+	}
+	http.NotFound(w, req)
+}
+
+type MultiRouter struct {
+	BasePath string
+	Routers  []*Router
+}
+
+func (mr *MultiRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+
+	// parse the request path
+	pathSegments := strings.Split(req.URL.Path, "/")
+	basePath := strings.TrimPrefix(mr.BasePath, "/")
+	if basePath != pathSegments[1] {
+		http.NotFound(w, req)
+		return
+	}
+
+	if len(pathSegments) < 3 {
+		http.NotFound(w, req)
+		return
+	}
+
+	// find the router that matches the second path segment
+	for _, router := range mr.Routers {
+		routerBasePath := strings.TrimSuffix(router.BasePath, "/")
+		routerBasePath = strings.TrimPrefix(routerBasePath, "/")
+		if routerBasePath == pathSegments[2] {
+			req.URL.Path = "/" + strings.Join(pathSegments[2:], "/")
+			router.ServeHTTP(w, req)
 			return
 		}
 	}
