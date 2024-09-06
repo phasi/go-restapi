@@ -163,6 +163,17 @@ type MultiRouter struct {
 	Routers  []*Router
 }
 
+// NewMultiRouter is a constructor function for MultiRouter
+func NewMultiRouter(basePath string, routers []*Router) (*MultiRouter, error) {
+	if basePath == "" || basePath == "/" {
+		return nil, errors.New("basePath cannot be empty or '/' for MultiRouter. If you want to use '/' as basePath, use a single Router instead")
+	}
+	return &MultiRouter{
+		BasePath: basePath,
+		Routers:  routers,
+	}, nil
+}
+
 func (mr *MultiRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// parse the request path
