@@ -168,6 +168,14 @@ func NewMultiRouter(basePath string, routers []*Router) (*MultiRouter, error) {
 	if basePath == "" || basePath == "/" {
 		return nil, errors.New("basePath cannot be empty or '/' for MultiRouter. If you want to use '/' as basePath, use a single Router instead")
 	}
+
+	// reconfigure router routes
+	for _, router := range routers {
+		for i, route := range router.Routes {
+			router.Routes[i].RelativePath = basePath + route.RelativePath
+		}
+	}
+
 	return &MultiRouter{
 		BasePath: basePath,
 		Routers:  routers,
@@ -194,7 +202,7 @@ func (mr *MultiRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		routerBasePath := strings.TrimSuffix(router.BasePath, "/")
 		routerBasePath = strings.TrimPrefix(routerBasePath, "/")
 		if routerBasePath == pathSegments[2] {
-			req.URL.Path = "/" + strings.Join(pathSegments[2:], "/")
+			// req.URL.Path = "/" + strings.Join(pathSegments[2:], "/")
 			router.ServeHTTP(w, req)
 			return
 		}
