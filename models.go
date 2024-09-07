@@ -11,34 +11,50 @@ type Response struct {
 	Data      interface{} `json:"data"`
 }
 
-// WriteJSON writes a JSON response to the ResponseWriter
-func WriteJSON(w http.ResponseWriter, data interface{}) {
+func getDefaultJSONResponse(data interface{}) interface{} {
+	if data == nil {
+		return Response{
+			Timestamp: time.Now().Unix(),
+			Data:      nil,
+		}
+	} else {
+		return Response{
+			Timestamp: time.Now().Unix(),
+			Data:      data,
+		}
+	}
+}
+
+var jsonResponseFormatter func(interface{}) interface{} = getDefaultJSONResponse
+
+func SetJSONResponseFormatter(f func(interface{}) interface{}) {
+	jsonResponseFormatter = f
+}
+
+func writeJSON(w http.ResponseWriter, data interface{}, usesTemplate bool) error {
 	sw := &statusWriter{ResponseWriter: w}
 	sw.Header().Set("Content-Type", "application/json")
 	if sw.status == 0 {
 		if data == nil {
 			sw.WriteHeader(http.StatusNoContent)
-			return
+			return nil
 		} else {
 			sw.WriteHeader(http.StatusOK)
 		}
 	}
-	if data == nil {
-		data = Response{
-			Timestamp: time.Now().Unix(),
-			Success:   true,
-			Message:   "Success",
-			Data:      nil,
-		}
-	} else {
-		data = Response{
-			Timestamp: time.Now().Unix(),
-			Success:   true,
-			Message:   "Success",
-			Data:      data,
-		}
+	if usesTemplate {
+		data = jsonResponseFormatter(data)
 	}
-	json.NewEncoder(sw).Encode(data) // TODO: handle error
+	return json.NewEncoder(sw).Encode(data)
+}
+
+// WriteJSON writes a JSON response to the ResponseWriter
+func WriteJSON(w http.ResponseWriter, data interface{}) error {
+	return writeJSON(w, data, true)
+}
+
+func WriteJSONWithoutTemplate(w http.ResponseWriter, data interface{}) error {
+	return writeJSON(w, data, false)
 }
 
 // ReadJSON reads a JSON request from the Request and decodes it into the provided interface
