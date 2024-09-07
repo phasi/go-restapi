@@ -8,8 +8,6 @@ import (
 
 type Response struct {
 	Timestamp int64       `json:"timestamp"`
-	Success   bool        `json:"success"`
-	Message   string      `json:"message"`
 	Data      interface{} `json:"data"`
 }
 
