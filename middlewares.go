@@ -156,7 +156,7 @@ func (config *CORSConfig) applyCORS(w http.ResponseWriter, r *http.Request) (err
 		}
 	}
 
-	w.Header().Set("Access-Control-Allow-Origin", origin)
+	w.Header().Set("Access-Control-Allow-Origin", strings.Join(config.AllowedOrigins, ","))
 	w.Header().Set("Access-Control-Allow-Methods", strings.Join(config.AllowedMethods, ","))
 	w.Header().Set("Access-Control-Allow-Headers", strings.Join(config.AllowedHeaders, ","))
 	var allowCredentials string
