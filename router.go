@@ -13,6 +13,7 @@ type RouteContext struct {
 	Params              *RouteParams
 	userId              string
 	requiredPermissions []Permission
+	CustomData          *CustomData
 }
 
 func (rc *RouteContext) HasRequiredPermissions(userPermissions []Permission) (hasAllPermissions bool) {
@@ -62,6 +63,20 @@ func (rp RouteParams) Get(key string) (string, error) {
 		return "", fmt.Errorf("parameter %s not found or its value is empty", key)
 	}
 	return value, nil
+}
+
+type CustomData map[string]interface{}
+
+func (cd CustomData) Get(key string) (interface{}, error) {
+	value, ok := cd[key]
+	if !ok {
+		return nil, fmt.Errorf("key %s not found", key)
+	}
+	return value, nil
+}
+
+func (cd CustomData) Set(key string, value interface{}) {
+	cd[key] = value
 }
 
 type RouteHandlerFunc func(http.ResponseWriter, *http.Request, *RouteContext)
@@ -133,6 +148,9 @@ func (router *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		// pass required permissions to route context
 		routeContext.requiredPermissions = route.RequiredPermissions
+		// pass custom data to route context
+		customData := make(CustomData)
+		routeContext.CustomData = &customData
 
 		if match {
 			if route.Protected {
