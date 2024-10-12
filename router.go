@@ -182,6 +182,16 @@ func NewMultiRouter(basePath string, routers []*Router) (*MultiRouter, error) {
 	}, nil
 }
 
+func (mr *MultiRouter) ListRoutes() []string {
+	var routes []string
+	for _, router := range mr.Routers {
+		for _, route := range router.Routes {
+			routes = append(routes, route.Method+" "+route.RelativePath)
+		}
+	}
+	return routes
+}
+
 func (mr *MultiRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// parse the request path
