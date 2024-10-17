@@ -94,6 +94,7 @@ type Router struct {
 	Routes                  []Route
 	AuthorizationMiddleware func(context *RouteContext, handler http.Handler) http.Handler
 	PermissionMiddleware    func(context *RouteContext, handler http.Handler) http.Handler
+	CORSConfig              *CORSConfig
 }
 
 func (router *Router) HandleFunc(method, path string, handler RouteHandlerFunc) {
@@ -116,16 +117,29 @@ func (router *Router) HandleProtectedFunc(method, path string, requiredPermissio
 		fixedPath = router.BasePath
 	}
 	route := Route{
-		Method:              method,
-		RelativePath:        fixedPath,
-		RequiredPermissions: requiredPermissions,
-		Handler:             handler,
-		Protected:           true,
+		Method:       method,
+		RelativePath: fixedPath,
+		Handler:      handler,
+		Protected:    true,
 	}
 	router.Routes = append(router.Routes, route)
 }
 
 func (router *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	// handle CORS
+	if router.CORSConfig == nil {
+		origin := req.Header.Get("Origin")
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Methods", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "*")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+	} else {
+		router.CORSConfig.HandleCORS(w, req)
+	}
+	if req.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	for _, route := range router.Routes {
 		if req.Method != route.Method {
 			continue

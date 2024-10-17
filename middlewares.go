@@ -2,7 +2,6 @@ package restapi
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"strings"
 
@@ -107,92 +106,44 @@ type CORSConfig struct {
 	BlockUserAgents []string
 }
 
-func (config *CORSConfig) applyCORS(w http.ResponseWriter, r *http.Request) (err error) {
-	origin := r.Header.Get("Origin")
-	// check if the origin is in allowed origins
-	if len(config.AllowedOrigins) > 0 {
-		var isAllowedOrigin bool = false
-		for _, allowedOrigin := range config.AllowedOrigins {
-			if allowedOrigin == "*" || allowedOrigin == origin {
-				isAllowedOrigin = true
-				break
-			}
-		}
-		if !isAllowedOrigin {
-			err = errors.New("origin not allowed")
-			return
-		}
-	}
-
-	method := r.Method
-	if !strings.Contains(strings.Join(config.AllowedMethods, ","), method) {
-		err = errors.New("method not allowed")
-		return
-	}
-	if len(config.AllowedHeaders) > 0 {
-		for headerName, headers := range r.Header {
-			// Convert header name to lower case for case insensitive comparison
-			lowerHeaderName := strings.ToLower(headerName)
-
-			// Block requests with blocked User-Agent
-			if lowerHeaderName == "user-agent" {
-				for _, blockedUserAgent := range config.BlockUserAgents {
-					if strings.Contains(strings.Join(headers, " "), blockedUserAgent) {
-						err = errors.New("User-Agent blocked")
-						return
-					}
-				}
-			}
-			// Allow some headers to be passed through
-			if lowerHeaderName == "user-agent" || lowerHeaderName == "accept" || lowerHeaderName == "host" {
-				continue
-			}
-
-			// Check if the header name is in the list of allowed headers
-			if !strings.Contains(strings.ToLower(strings.Join(config.AllowedHeaders, ",")), lowerHeaderName) {
-				err = errors.New("header not allowed")
+func (config *CORSConfig) HandleCORS(w http.ResponseWriter, r *http.Request) {
+	if len(config.BlockUserAgents) > 0 {
+		userAgent := r.Header.Get("User-Agent")
+		for _, blockUserAgent := range config.BlockUserAgents {
+			if strings.Contains(userAgent, blockUserAgent) {
+				w.WriteHeader(http.StatusForbidden)
 				return
 			}
 		}
 	}
-
-	w.Header().Set("Access-Control-Allow-Origin", strings.Join(config.AllowedOrigins, ","))
-	w.Header().Set("Access-Control-Allow-Methods", strings.Join(config.AllowedMethods, ","))
-	w.Header().Set("Access-Control-Allow-Headers", strings.Join(config.AllowedHeaders, ","))
-	var allowCredentials string
-	if config.AllowCredentials {
-		allowCredentials = "true"
-	} else {
-		allowCredentials = "false"
+	origin := r.Header.Get("Origin")
+	if config.AllowedOrigins != nil && len(config.AllowedOrigins) > 0 {
+		allowed := false
+		for _, allowedOrigin := range config.AllowedOrigins {
+			if allowedOrigin == "*" {
+				allowed = true
+				break
+			}
+			if allowedOrigin == origin {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		if len(config.AllowedMethods) > 0 {
+			w.Header().Set("Access-Control-Allow-Methods", strings.Join(config.AllowedMethods, ","))
+		}
+		if len(config.AllowedHeaders) > 0 {
+			w.Header().Set("Access-Control-Allow-Headers", strings.Join(config.AllowedHeaders, ","))
+		}
+		if config.AllowCredentials {
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
+		return
 	}
-	w.Header().Set("Access-Control-Allow-Credentials", allowCredentials)
-	return
-}
-
-// MiddlewareFunc is a middleware that should be used to wrap individual handler functions (RouteHandlerFunc)
-func (config *CORSConfig) MiddlewareFunc(next RouteHandlerFunc) RouteHandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request, context *RouteContext) {
-		err := config.applyCORS(w, r)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusForbidden)
-			return
-		}
-		next(w, r, context)
-	}
-}
-
-// CORSRouter is a middleware that should be used to wrap the main router
-func (config *CORSConfig) CORSRouter(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		err := config.applyCORS(w, r)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusForbidden)
-			return
-		}
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+	w.Header().Set("Access-Control-Allow-Origin", origin)
 }
