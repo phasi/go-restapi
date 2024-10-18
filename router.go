@@ -117,10 +117,11 @@ func (router *Router) HandleProtectedFunc(method, path string, requiredPermissio
 		fixedPath = router.BasePath
 	}
 	route := Route{
-		Method:       method,
-		RelativePath: fixedPath,
-		Handler:      handler,
-		Protected:    true,
+		Method:              method,
+		RelativePath:        fixedPath,
+		Handler:             handler,
+		RequiredPermissions: requiredPermissions,
+		Protected:           true,
 	}
 	router.Routes = append(router.Routes, route)
 }
