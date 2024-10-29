@@ -145,4 +145,5 @@ func (config *CORSConfig) HandleCORS(w http.ResponseWriter, r *http.Request) (al
 		return
 	}
 	w.Header().Set("Access-Control-Allow-Origin", origin)
+	return
 }
