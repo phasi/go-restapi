@@ -135,7 +135,11 @@ func (router *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Access-Control-Allow-Headers", "*")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 	} else {
-		router.CORSConfig.HandleCORS(w, req)
+		allowed := router.CORSConfig.HandleCORS(w, req)
+		if !allowed {
+			w.Write([]byte("CORS not allowed"))
+			return
+		}
 	}
 	if req.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)

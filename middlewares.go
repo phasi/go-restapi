@@ -106,7 +106,7 @@ type CORSConfig struct {
 	BlockUserAgents []string
 }
 
-func (config *CORSConfig) HandleCORS(w http.ResponseWriter, r *http.Request) {
+func (config *CORSConfig) HandleCORS(w http.ResponseWriter, r *http.Request) (allowed bool) {
 	if len(config.BlockUserAgents) > 0 {
 		userAgent := r.Header.Get("User-Agent")
 		for _, blockUserAgent := range config.BlockUserAgents {
@@ -118,7 +118,6 @@ func (config *CORSConfig) HandleCORS(w http.ResponseWriter, r *http.Request) {
 	}
 	origin := r.Header.Get("Origin")
 	if config.AllowedOrigins != nil && len(config.AllowedOrigins) > 0 {
-		allowed := false
 		for _, allowedOrigin := range config.AllowedOrigins {
 			if allowedOrigin == "*" {
 				allowed = true
