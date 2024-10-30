@@ -95,55 +95,34 @@ func TracingRouter(next http.Handler) http.Handler {
 // CORSConfig is a configuration struct for the CORS middleware
 type CORSConfig struct {
 	// AllowedOrigins is a list of origins allowed to make requests
-	AllowedOrigins []string
+	AllowedOrigin string
 	// AllowedMethods is a list of HTTP methods allowed in the request
 	AllowedMethods []string
 	// AllowedHeaders is a list of headers allowed in the request
 	AllowedHeaders []string
 	// AllowCredentials is a boolean that determines if credentials are allowed in the request
 	AllowCredentials bool
-	// if User-Agent contains any of the strings in BlockUserAgents, the request will be blocked
-	BlockUserAgents []string
 }
 
-func (config *CORSConfig) HandleCORS(w http.ResponseWriter, r *http.Request) (allowed bool) {
-	if len(config.BlockUserAgents) > 0 {
-		userAgent := r.Header.Get("User-Agent")
-		for _, blockUserAgent := range config.BlockUserAgents {
-			if strings.Contains(userAgent, blockUserAgent) {
-				w.WriteHeader(http.StatusForbidden)
-				return
-			}
-		}
-	}
-	origin := r.Header.Get("Origin")
-	if config.AllowedOrigins != nil && len(config.AllowedOrigins) > 0 {
-		for _, allowedOrigin := range config.AllowedOrigins {
-			if allowedOrigin == "*" {
-				allowed = true
-				break
-			}
-			if allowedOrigin == origin {
-				allowed = true
-				break
-			}
-		}
-		if !allowed {
-			w.WriteHeader(http.StatusForbidden)
-			return
-		}
-		w.Header().Set("Access-Control-Allow-Origin", origin)
-		if len(config.AllowedMethods) > 0 {
-			w.Header().Set("Access-Control-Allow-Methods", strings.Join(config.AllowedMethods, ","))
-		}
-		if len(config.AllowedHeaders) > 0 {
-			w.Header().Set("Access-Control-Allow-Headers", strings.Join(config.AllowedHeaders, ","))
-		}
-		if config.AllowCredentials {
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
-		}
-		return
+func (config *CORSConfig) HandleCORS(w http.ResponseWriter, r *http.Request) {
+	origin := config.AllowedOrigin
+	if origin == "" {
+		origin = r.Header.Get("Origin")
 	}
 	w.Header().Set("Access-Control-Allow-Origin", origin)
-	return
+	if len(config.AllowedMethods) > 0 {
+		w.Header().Set("Access-Control-Allow-Methods", strings.Join(config.AllowedMethods, ","))
+	} else {
+		w.Header().Set("Access-Control-Allow-Methods", "*")
+	}
+	if len(config.AllowedHeaders) > 0 {
+		w.Header().Set("Access-Control-Allow-Headers", strings.Join(config.AllowedHeaders, ","))
+	} else {
+		w.Header().Set("Access-Control-Allow-Headers", "*")
+	}
+	if config.AllowCredentials {
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+	} else {
+		w.Header().Set("Access-Control-Allow-Credentials", "false")
+	}
 }
