@@ -3,7 +3,6 @@ package restapi
 import (
 	"context"
 	"net/http"
-	"strings"
 
 	"github.com/google/uuid"
 )
@@ -90,39 +89,4 @@ func TracingRouter(next http.Handler) http.Handler {
 		w.Header().Set("X-Trace-ID", traceID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
-}
-
-// CORSConfig is a configuration struct for the CORS middleware
-type CORSConfig struct {
-	// AllowedOrigins is a list of origins allowed to make requests
-	AllowedOrigin string
-	// AllowedMethods is a list of HTTP methods allowed in the request
-	AllowedMethods []string
-	// AllowedHeaders is a list of headers allowed in the request
-	AllowedHeaders []string
-	// AllowCredentials is a boolean that determines if credentials are allowed in the request
-	AllowCredentials bool
-}
-
-func (config *CORSConfig) HandleCORS(w http.ResponseWriter, r *http.Request) {
-	origin := config.AllowedOrigin
-	if origin == "" {
-		origin = r.Header.Get("Origin")
-	}
-	w.Header().Set("Access-Control-Allow-Origin", origin)
-	if len(config.AllowedMethods) > 0 {
-		w.Header().Set("Access-Control-Allow-Methods", strings.Join(config.AllowedMethods, ","))
-	} else {
-		w.Header().Set("Access-Control-Allow-Methods", "*")
-	}
-	if len(config.AllowedHeaders) > 0 {
-		w.Header().Set("Access-Control-Allow-Headers", strings.Join(config.AllowedHeaders, ","))
-	} else {
-		w.Header().Set("Access-Control-Allow-Headers", "*")
-	}
-	if config.AllowCredentials {
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
-	} else {
-		w.Header().Set("Access-Control-Allow-Credentials", "false")
-	}
 }
