@@ -41,6 +41,7 @@ func TestCreateAndStartServer(t *testing.T) {
 
 	// simulate a simple request
 	wg.Add(1)
+	// expect this handler to be found
 	go func() {
 		resp, err := client.Get("http://localhost:8080/test")
 		if err != nil {
@@ -54,13 +55,14 @@ func TestCreateAndStartServer(t *testing.T) {
 		wg.Done()
 	}()
 	wg.Add(1)
+	// expect this handler to NOT be found
 	go func() {
 		resp, err := client.Get("http://localhost:8080/test2")
 		if err != nil {
 			t.Error(err)
 		}
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Expected status code %d, got %d", http.StatusOK, resp.StatusCode)
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected status code %d, got %d", http.StatusNotFound, resp.StatusCode)
 		} else {
 			t.Log("Client request successful")
 		}
