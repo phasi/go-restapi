@@ -129,11 +129,11 @@ func (router *Router) HandleProtectedFunc(method, path string, requiredPermissio
 func (router *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// handle CORS
 	if router.CORSConfig == nil {
-		origin := req.Header.Get("Origin")
-		w.Header().Set("Access-Control-Allow-Origin", origin)
-		w.Header().Set("Access-Control-Allow-Methods", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "*")
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		// Default: restrictive CORS policy for security
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Credentials", "false")
 	} else {
 		router.CORSConfig.HandleCORS(w, req)
 	}
@@ -227,25 +227,39 @@ func (mr *MultiRouter) ListRoutes() []string {
 
 func (mr *MultiRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
-	// parse the request path
-	pathSegments := strings.Split(req.URL.Path, "/")
-	basePath := strings.TrimPrefix(mr.BasePath, "/")
-	if basePath != pathSegments[1] {
+	// Check if the request path starts with the base path
+	basePath := strings.TrimSuffix(mr.BasePath, "/")
+	if !strings.HasPrefix(req.URL.Path, basePath) {
 		http.NotFound(w, req)
 		return
 	}
 
-	if len(pathSegments) < 3 {
-		http.NotFound(w, req)
-		return
-	}
-
-	// find the router that matches the second path segment
+	// Try each router to see if it can handle the request
 	for _, router := range mr.Routers {
-		routerBasePath := strings.TrimSuffix(router.BasePath, "/")
-		routerBasePath = strings.TrimPrefix(routerBasePath, "/")
-		if routerBasePath == pathSegments[2] {
-			// req.URL.Path = "/" + strings.Join(pathSegments[2:], "/")
+		routeFound := false
+		for _, route := range router.Routes {
+			if req.Method == route.Method {
+				routeSegments := strings.Split(route.RelativePath, "/")
+				pathSegments := strings.Split(req.URL.Path, "/")
+				if len(routeSegments) == len(pathSegments) {
+					match := true
+					for i, routeSegment := range routeSegments {
+						if strings.HasPrefix(routeSegment, ":") {
+							// Parameter match - always matches
+							continue
+						} else if routeSegment != pathSegments[i] {
+							match = false
+							break
+						}
+					}
+					if match {
+						routeFound = true
+						break
+					}
+				}
+			}
+		}
+		if routeFound {
 			router.ServeHTTP(w, req)
 			return
 		}
