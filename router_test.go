@@ -12,21 +12,13 @@ import (
 
 // create a channel to receive OS signals
 var sigChan chan os.Signal = make(chan os.Signal, 1)
-var router *Router
+var handler http.Handler
 
-func TestCreateRoutes(t *testing.T) {
-	router = &Router{}
-
-	router.HandleFunc("GET", "/test", func(w http.ResponseWriter, r *http.Request, routeContext *RouteContext) {
-		w.WriteHeader(http.StatusOK)
-	})
-
-}
-func TestCreateAndStartServer(t *testing.T) {
+func createAndStartServer(t *testing.T) {
 	// create a server
 	server := &http.Server{
 		Addr:    ":8080",
-		Handler: router,
+		Handler: handler,
 	}
 	// start the server in a goroutine
 	go func() {
@@ -43,7 +35,7 @@ func TestCreateAndStartServer(t *testing.T) {
 	wg.Add(1)
 	// expect this handler to be found
 	go func() {
-		resp, err := client.Get("http://localhost:8080/test")
+		resp, err := client.Get("http://localhost:8080/full/path/to/test")
 		if err != nil {
 			t.Error(err)
 		}
@@ -57,7 +49,7 @@ func TestCreateAndStartServer(t *testing.T) {
 	wg.Add(1)
 	// expect this handler to NOT be found
 	go func() {
-		resp, err := client.Get("http://localhost:8080/test2")
+		resp, err := client.Get("http://localhost:8080/full/path/to/test2")
 		if err != nil {
 			t.Error(err)
 		}
@@ -81,4 +73,31 @@ func TestCreateAndStartServer(t *testing.T) {
 	if err := server.Shutdown(ctx); err != nil {
 		t.Fatalf("Server Shutdown Failed:%+v", err)
 	}
+}
+
+func TestCreateRouter(t *testing.T) {
+	router := &Router{}
+
+	router.HandleFunc("GET", "/full/path/to/test", func(w http.ResponseWriter, r *http.Request, routeContext *RouteContext) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler = router
+	createAndStartServer(t)
+}
+
+func TestCreateMultiRouter(t *testing.T) {
+	rout := &Router{}
+
+	rout.HandleFunc("GET", "/test", func(w http.ResponseWriter, r *http.Request, routeContext *RouteContext) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	mr, err := NewMultiRouter("/full/path/to", []*Router{rout})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	handler = mr
+	createAndStartServer(t)
 }
