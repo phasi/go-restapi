@@ -217,6 +217,30 @@ CORSConfig: &api.CORSConfig{
 }
 ```
 
+### Global CORS Configuration
+
+Control how CORS headers are handled when the `Origin` header is missing:
+
+```go
+// Spec-compliant mode (default): Only set CORS headers when Origin header is present
+api.SetCORSAlwaysOn(false)
+
+// Developer-friendly mode: Always set CORS headers, even without Origin header
+api.SetCORSAlwaysOn(true)
+```
+
+**Spec-compliant mode (default):**
+
+- Only sets CORS headers when `Origin` header is present
+- Follows W3C CORS specification strictly
+- More secure and standards-compliant
+
+**Always-on mode:**
+
+- Sets CORS headers even for requests without `Origin` header
+- Uses `Access-Control-Allow-Origin: *` as fallback
+- Helpful for debugging and testing tools
+
 ## JSON Utilities
 
 ### Writing JSON Responses
@@ -611,6 +635,11 @@ type CORSConfig struct {
 
 - `HandleFunc(method, path string, handler RouteHandlerFunc)`
 - `HandleProtectedFunc(method, path string, permissions []Permission, handler RouteHandlerFunc)`
+
+#### Global Configuration
+
+- `SetCORSAlwaysOn(alwaysOn bool)` - Configure CORS behavior for missing Origin header
+- `GetCORSAlwaysOn() bool` - Get current CORS always-on setting
 
 #### JSON Utilities
 

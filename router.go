@@ -133,11 +133,19 @@ func (router *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if !corsAlreadyHandled {
 		// handle CORS
 		if router.CORSConfig == nil {
-			// Default: restrictive CORS policy for security
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-			w.Header().Set("Access-Control-Allow-Credentials", "false")
+			// Default CORS that respects global corsAlwaysOn setting
+			requestOrigin := req.Header.Get("Origin")
+			originHeaderMissing := requestOrigin == ""
+
+			// Only set default CORS if:
+			// 1. Origin header is present, OR
+			// 2. corsAlwaysOn is enabled
+			if !originHeaderMissing || GetCORSAlwaysOn() {
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+				w.Header().Set("Access-Control-Allow-Credentials", "false")
+			}
 		} else {
 			router.CORSConfig.HandleCORS(w, req)
 		}

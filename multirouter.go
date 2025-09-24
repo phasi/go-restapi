@@ -119,13 +119,21 @@ func (mr *MultiRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	} else if matchingRouter != nil {
-		// Per-router CORS handling
+		// Per-router CORS handling - respect global corsAlwaysOn setting
 		if matchingRouter.CORSConfig == nil {
-			// Default CORS for this router
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-			w.Header().Set("Access-Control-Allow-Credentials", "false")
+			// Create a temporary default config that respects corsAlwaysOn
+			requestOrigin := req.Header.Get("Origin")
+			originHeaderMissing := requestOrigin == ""
+
+			// Only set default CORS if:
+			// 1. Origin header is present, OR
+			// 2. corsAlwaysOn is enabled
+			if !originHeaderMissing || GetCORSAlwaysOn() {
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+				w.Header().Set("Access-Control-Allow-Credentials", "false")
+			}
 		} else {
 			matchingRouter.CORSConfig.HandleCORS(w, req)
 		}

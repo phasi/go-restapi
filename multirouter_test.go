@@ -7,6 +7,10 @@ import (
 )
 
 func TestMultiRouterCORS(t *testing.T) {
+	// Store original setting and restore after tests
+	originalSetting := GetCORSAlwaysOn()
+	defer SetCORSAlwaysOn(originalSetting)
+
 	// Helper function to create fresh routers for each test
 	createRouters := func() (*Router, *Router) {
 		userRouter := &Router{BasePath: "/users"}
@@ -23,6 +27,8 @@ func TestMultiRouterCORS(t *testing.T) {
 	}
 
 	t.Run("MultiRouter with default CORS", func(t *testing.T) {
+		SetCORSAlwaysOn(true) // Enable always-on mode for this test
+
 		userRouter, orderRouter := createRouters()
 		multiRouter, err := NewMultiRouter("/api/v1", []*Router{userRouter, orderRouter})
 		if err != nil {
@@ -38,7 +44,7 @@ func TestMultiRouterCORS(t *testing.T) {
 			t.Errorf("Expected status 200 for OPTIONS, got %d", w.Code)
 		}
 
-		// Check CORS headers
+		// Check CORS headers - should be present in always-on mode even without Origin
 		if origin := w.Header().Get("Access-Control-Allow-Origin"); origin != "*" {
 			t.Errorf("Expected origin '*', got '%s'", origin)
 		}
@@ -49,6 +55,8 @@ func TestMultiRouterCORS(t *testing.T) {
 	})
 
 	t.Run("MultiRouter with custom CORS", func(t *testing.T) {
+		SetCORSAlwaysOn(false) // Can use strict mode since we're providing Origin header
+
 		userRouter, orderRouter := createRouters()
 		corsConfig := &CORSConfig{
 			AllowedOrigins:   []string{"https://myapp.com"},
@@ -88,6 +96,8 @@ func TestMultiRouterCORS(t *testing.T) {
 	})
 
 	t.Run("Actual route requests still work", func(t *testing.T) {
+		SetCORSAlwaysOn(true) // Set to always-on mode for this test
+
 		userRouter, orderRouter := createRouters()
 		multiRouter, err := NewMultiRouter("/api/v1", []*Router{userRouter, orderRouter})
 		if err != nil {
