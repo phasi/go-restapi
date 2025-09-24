@@ -313,7 +313,12 @@ http.ListenAndServe(":8080", tracedRouter)
 
 ## Multi-Router Support
 
-For complex applications with multiple API versions or modules:
+For complex applications with multiple API versions or modules. MultiRouter supports two CORS strategies:
+
+1. **Per-Router CORS** (default): Each router keeps its own CORS settings
+2. **Unified CORS**: One CORS configuration overrides all routers
+
+### Basic Multi-Router
 
 ```go
 // Create separate routers for different concerns
@@ -340,7 +345,64 @@ if err != nil {
 // POST /api/v1/orders/
 ```
 
-### Custom Data in Context
+### Multi-Router with Unified CORS
+
+Apply the same CORS configuration to all routers:
+
+```go
+corsConfig := &api.CORSConfig{
+    AllowedOrigins:   []string{"https://myapp.com"},
+    AllowCredentials: true,
+}
+
+multiRouter, err := api.NewMultiRouterWithCORS("/api/v1", routers, corsConfig)
+```
+
+### Multi-Router with Per-Router CORS
+
+Different CORS settings for different API sections (e.g., public vs private APIs):
+
+````go
+// Public API - permissive CORS
+publicRouter := &api.Router{
+    BasePath: "/public",
+    CORSConfig: &api.CORSConfig{
+        AllowedOrigins:   []string{"*"},
+        AllowCredentials: false,
+    },
+}
+publicRouter.HandleFunc("GET", "/data", publicDataHandler)
+
+// Private API - restrictive CORS
+privateRouter := &api.Router{
+    BasePath: "/private",
+    CORSConfig: &api.CORSConfig{
+        AllowedOrigins:   []string{"https://internal-app.com"},
+        AllowCredentials: true,
+    },
+}
+privateRouter.HandleFunc("GET", "/data", privateDataHandler)
+
+// Admin API - very restrictive CORS
+adminRouter := &api.Router{
+    BasePath: "/admin",
+    CORSConfig: &api.CORSConfig{
+        AllowedOrigins:   []string{"https://admin.internal.com"},
+        AllowCredentials: true,
+        MaxAge:           3600,
+    },
+}
+adminRouter.HandleFunc("GET", "/users", adminUsersHandler)
+
+// Use basic NewMultiRouter - preserves individual router CORS settings by default
+multiRouter, err := api.NewMultiRouter("/api/v1",
+    []*Router{publicRouter, privateRouter, adminRouter})
+
+// Results in:
+// - /api/v1/public/* allows any origin without credentials
+// - /api/v1/private/* only allows internal-app.com with credentials
+// - /api/v1/admin/* only allows admin.internal.com with strict settings
+```### Custom Data in Context
 
 Store and retrieve custom data during request processing:
 
@@ -356,7 +418,7 @@ router.HandleFunc("GET", "/example", func(w http.ResponseWriter, r *http.Request
 
     // Use the data...
 })
-```
+````
 
 ## Complete Example
 
@@ -565,7 +627,8 @@ type CORSConfig struct {
 
 #### Multi-Router
 
-- `NewMultiRouter(basePath string, routers []*Router) (*MultiRouter, error)`
+- `NewMultiRouter(basePath string, routers []*Router) (*MultiRouter, error)` - Preserves individual router CORS settings
+- `NewMultiRouterWithCORS(basePath string, routers []*Router, corsConfig *CORSConfig) (*MultiRouter, error)` - Applies unified CORS to all routers
 
 ## Best Practices
 
