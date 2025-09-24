@@ -1,0 +1,92 @@
+package restapi
+
+import (
+	"context"
+	"net/http"
+
+	"github.com/google/uuid"
+)
+
+// statusWriter is a wrapper around the ResponseWriter that stores the status code
+type statusWriter struct {
+	http.ResponseWriter
+	status      int
+	wroteHeader bool
+}
+
+// WriteHeader is a wrapper around the ResponseWriter's WriteHeader method that stores the status code
+func (sw *statusWriter) WriteHeader(statusCode int) {
+	if !sw.wroteHeader {
+		sw.status = statusCode
+		sw.ResponseWriter.WriteHeader(statusCode)
+		sw.wroteHeader = true
+	}
+}
+
+type HttpLogEntry struct {
+	Method  string              `json:"method"`
+	Path    string              `json:"path"`
+	Status  int                 `json:"status"`
+	Headers map[string][]string `json:"headers"`
+	TraceID string              `json:"trace_id,omitempty"`
+}
+
+var redactedHeaderNames = []string{}
+
+// SetRedactedHeaderNames sets the list of header names that should be redacted in the logs
+func SetRedactedHeaderNames(headerNames []string) {
+	redactedHeaderNames = headerNames
+}
+
+func inRedactedHeaders(headerName string) bool {
+	for _, redactedHeaderName := range redactedHeaderNames {
+		if redactedHeaderName == headerName {
+			return true
+		}
+	}
+	return false
+}
+
+func redactHeaders(headers http.Header) map[string][]string {
+	redactedHeader := []string{"[REDACTED]"}
+	redactedHeaders := make(map[string][]string)
+	for key, value := range headers {
+		if inRedactedHeaders(key) {
+			redactedHeaders[key] = redactedHeader
+		} else {
+			redactedHeaders[key] = value
+		}
+	}
+	return redactedHeaders
+}
+
+// LoggingRouter is a middleware that logs the request method, URL path and response status code
+func LoggingRouter(next http.Handler, logFunc func(entry HttpLogEntry)) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sw := statusWriter{ResponseWriter: w}
+		next.ServeHTTP(&sw, r)
+		headers := redactHeaders(r.Header)
+		traceID := r.Context().Value(contextKeyTraceID)
+		// try to convert traceID to string
+		traceIDString, ok := traceID.(string)
+		if !ok {
+			traceIDString = ""
+		}
+		logFunc(HttpLogEntry{r.Method, r.URL.Path, sw.status, headers, traceIDString})
+	})
+
+}
+
+type contextKey string
+
+var contextKeyTraceID = contextKey("traceID")
+
+// TracingRouter is a middleware that adds a trace ID to the request context and response headers
+func TracingRouter(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		traceID := uuid.New().String()
+		ctx := context.WithValue(r.Context(), contextKeyTraceID, traceID)
+		w.Header().Set("X-Trace-ID", traceID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
