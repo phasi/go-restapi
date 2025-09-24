@@ -371,7 +371,7 @@ import (
     "net/http"
     "time"
 
-    api "github.com/your-username/go-restapi"
+    api "github.com/phasi/go-restapi"
 )
 
 // Define permissions
